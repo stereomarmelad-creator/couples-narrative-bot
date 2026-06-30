@@ -5,6 +5,18 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ═══════════════════════════════════════
+-- PAIRS (must be first, referenced by users)
+-- ═══════════════════════════════════════
+CREATE TABLE IF NOT EXISTS pairs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_code TEXT UNIQUE NOT NULL,
+  user1_id UUID,
+  user2_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paired_at TIMESTAMPTZ
+);
+
+-- ═══════════════════════════════════════
 -- USERS
 -- ═══════════════════════════════════════
 CREATE TABLE IF NOT EXISTS users (
@@ -16,17 +28,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ═══════════════════════════════════════
--- PAIRS
--- ═══════════════════════════════════════
-CREATE TABLE IF NOT EXISTS pairs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  invite_code TEXT UNIQUE NOT NULL,
-  user1_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  user2_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  paired_at TIMESTAMPTZ
-);
+-- Add foreign keys for pairs after users exists
+ALTER TABLE pairs ADD CONSTRAINT fk_user1 FOREIGN KEY (user1_id) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE pairs ADD CONSTRAINT fk_user2 FOREIGN KEY (user2_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ═══════════════════════════════════════
 -- MESSAGES (encrypted)
@@ -90,8 +94,6 @@ CREATE TABLE IF NOT EXISTS chapter_embeddings (
 -- ═══════════════════════════════════════
 -- INDEXES
 -- ═══════════════════════════════════════
-
--- B-tree indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_users_pair_id ON users(pair_id);
 CREATE INDEX IF NOT EXISTS idx_pairs_invite_code ON pairs(invite_code);
@@ -137,11 +139,3 @@ BEGIN
   LIMIT match_limit;
 END;
 $$;
-
--- ═══════════════════════════════════════
--- ROW LEVEL SECURITY (optional, disabled by default for simplicity)
--- ═══════════════════════════════════════
--- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE pairs ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE chapters ENABLE ROW LEVEL SECURITY;
