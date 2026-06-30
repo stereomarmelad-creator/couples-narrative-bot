@@ -1,19 +1,40 @@
 var fetch = require('node-fetch');
 
-var OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-var EMBEDDING_URL = 'https://openrouter.ai/api/v1/embeddings';
+// LLM endpoint (AITunnel or any OpenAI-compatible)
+var LLM_URL = process.env.LLM_API_URL || 'https://api.aitunnel.ru/v1/chat/completions';
+var LLM_KEY = process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY;
 
-var CHAPTER_MODEL = 'google/gemma-2-27b-it:free';
-var EMBEDDING_MODEL = 'google/gemini-embedding-001';
-var SAFETY_MODEL = 'google/gemma-2-27b-it:free';
+// Embedding endpoint (OpenRouter recommended)
+var EMBEDDING_URL = process.env.EMBEDDING_API_URL || 'https://openrouter.ai/api/v1/embeddings';
+var EMBEDDING_KEY = process.env.EMBEDDING_API_KEY || process.env.OPENROUTER_API_KEY;
 
-function getHeaders() {
-  return {
+var CHAPTER_MODEL = process.env.CHAPTER_MODEL || 'deepseek/deepseek-v4-flash';
+var SAFETY_MODEL = process.env.SAFETY_MODEL || 'deepseek/deepseek-v4-flash';
+var EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'google/gemini-embedding-001';
+
+function getLlmHeaders() {
+  var headers = {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + process.env.OPENROUTER_API_KEY,
-    'HTTP-Referer': process.env.WEBHOOK_URL || 'http://localhost:3000',
-    'X-Title': 'Couples Narrative Bot'
+    'Authorization': 'Bearer ' + LLM_KEY
   };
+  // OpenRouter-specific headers (safe to skip for AITunnel)
+  if (LLM_URL.indexOf('openrouter.ai') > -1) {
+    headers['HTTP-Referer'] = process.env.WEBHOOK_URL || 'http://localhost:3000';
+    headers['X-Title'] = 'Couples Narrative Bot';
+  }
+  return headers;
+}
+
+function getEmbeddingHeaders() {
+  var headers = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + EMBEDDING_KEY
+  };
+  if (EMBEDDING_URL.indexOf('openrouter.ai') > -1) {
+    headers['HTTP-Referer'] = process.env.WEBHOOK_URL || 'http://localhost:3000';
+    headers['X-Title'] = 'Couples Narrative Bot';
+  }
+  return headers;
 }
 
 async function chatCompletion(messages, model, maxTokens) {
@@ -25,14 +46,14 @@ async function chatCompletion(messages, model, maxTokens) {
     max_tokens: maxTokens,
     temperature: 0.7
   };
-  var res = await fetch(OPENROUTER_URL, {
+  var res = await fetch(LLM_URL, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: getLlmHeaders(),
     body: JSON.stringify(body)
   });
   if (!res.ok) {
     var errText = await res.text();
-    console.error('OpenRouter error:', res.status, errText);
+    console.error('LLM error:', res.status, errText);
     throw new Error('LLM request failed: ' + res.status);
   }
   var data = await res.json();
@@ -47,7 +68,7 @@ async function createEmbedding(text, model) {
   };
   var res = await fetch(EMBEDDING_URL, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: getEmbeddingHeaders(),
     body: JSON.stringify(body)
   });
   if (!res.ok) {
